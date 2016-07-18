@@ -18,33 +18,21 @@ import java.util.*;
  * Nukkit Project
  */
 public class SessionManager {
+    public final long serverId;
     protected final Packet.PacketFactory[] packetPool = new Packet.PacketFactory[256];
-
-    protected RakNetServer server;
-
-    protected UDPServerSocket socket;
-
+    protected final RakNetServer server;
+    protected final UDPServerSocket socket;
+    protected final Map<String, Session> sessions = new HashMap<>();
+    protected final Map<String, Long> block = new HashMap<>();
+    protected final Map<String, Integer> ipSec = new HashMap<>();
+    public boolean portChecking = true;
     protected int receiveBytes = 0;
     protected int sendBytes = 0;
-
-    protected Map<String, Session> sessions = new HashMap<>();
-
     protected String name = "";
-
     protected int packetLimit = 1000;
-
     protected boolean shutdown = false;
-
     protected long ticks = 0;
     protected long lastMeasure;
-
-    protected Map<String, Long> block = new HashMap<>();
-    protected Map<String, Integer> ipSec = new HashMap<>();
-
-    public boolean portChecking = true;
-
-    public long serverId;
-
     protected String currentSource = "";
 
     public SessionManager(RakNetServer server, UDPServerSocket socket) throws Exception {
@@ -81,7 +69,7 @@ public class SessionManager {
                     }
                     --max;
                 } catch (Exception e) {
-                    if (currentSource != "") {
+                    if (!"".equals(currentSource)) {
                         this.blockAddress(currentSource);
                     }
                     // else ignore
@@ -194,12 +182,14 @@ public class SessionManager {
 
     public void sendPacket(Packet packet, String dest, int port) throws IOException {
         packet.encode();
-        this.sendBytes += this.socket.writePacket(packet.buffer, dest, port);
+        sendBytes += packet.buffer.length;
+        socket.writePacket(packet.buffer, new InetSocketAddress(dest, port));
     }
 
     public void sendPacket(Packet packet, InetSocketAddress dest) throws IOException {
         packet.encode();
-        this.sendBytes += this.socket.writePacket(packet.buffer, dest);
+        sendBytes += packet.buffer.length;
+        socket.writePacket(packet.buffer, dest);
     }
 
     public void streamEncapsulated(Session session, EncapsulatedPacket packet) {
@@ -329,7 +319,7 @@ public class SessionManager {
                     int port = Binary.readShort(Binary.subBytes(packet, offset, 2));
                     offset += 2;
                     byte[] payload = Binary.subBytes(packet, offset);
-                    this.socket.writePacket(payload, address, port);
+                    this.socket.writePacket(payload, new InetSocketAddress(address, port));
                     break;
                 case RakNet.PACKET_CLOSE_SESSION:
                     len = packet[offset++];
